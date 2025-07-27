@@ -16,7 +16,7 @@ export const uptimeChecks = sqliteTable("uptime_checks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   websiteId: integer("websiteId")
     .notNull()
-    .references(() => websites.id),
+    .references(() => websites.id, {onDelete: 'cascade'}),
   timestamp: text("timestamp").notNull(),
   status: integer("status"),
   responseTime: integer("responseTime"),
