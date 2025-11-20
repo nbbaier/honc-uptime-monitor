@@ -1,67 +1,70 @@
 # Codebase Scout Report: honc-uptime-monitor
 
+**Last Updated:** November 19, 2025
+
 ## Overview
-This project is a website uptime monitor built on the Cloudflare stack. It allows users to add websites to be monitored, tracks their uptime status and response times, and displays the results.
+This is a serverless website uptime monitoring application built with the HONC stack (Hono, OpenTelemetry, and Cloudflare). It monitors multiple websites simultaneously, tracks response times and HTTP status codes, and calculates uptime percentages.
 
-## Tech Stack
-- **Runtime:** Cloudflare Workers
-- **Framework:** Hono (Web Application Framework)
-- **Database:** Drizzle ORM with SQLite (Cloudflare D1)
-- **Scheduling:** Cloudflare Durable Objects (`Monitor` class)
-- **Language:** TypeScript
-- **Tooling:**
-  - `wrangler`: Cloudflare development and deployment CLI
-  - `biome`: Formatting and Linting
-  - `fiberplane`: API exploration
+## Architecture
 
-## Key Components
+### Core Components
 
-### 1. Application Entry Point (`src/index.tsx`)
-- Defines the Hono application.
-- Serves the UI using Server-Side Rendering (SSR) with Hono's JSX renderer.
-- Provides API endpoints for:
-  - CRUD operations for websites (`/api/website`, `/api/websites`).
-  - Fetching uptime checks (`/api/website/:id/checks`).
-  - Calculating uptime statistics (`/websites/:id/uptime`).
-- Initializes the `Monitor` Durable Object when a new website is created.
+1. **Entry Point** (`src/index.tsx`)
+   - Hono web application with RESTful API endpoints
+   - Serves SSR UI using Hono's JSX renderer
+   - API routes: `/api/websites`, `/api/website/:id`, `/api/website/:id/checks`, `/websites/:id/uptime`
+   - Creates Monitor Durable Objects when websites are added
 
-### 2. Database Schema (`src/db/schema.ts`)
-- **`websites` table:** Stores website configuration (URL, name, check interval).
-- **`uptimeChecks` table:** Stores the results of each check (timestamp, status, response time, isUp).
+2. **Database Layer** (`src/db/schema.ts`)
+   - `websites` table: stores URL, name, check interval, creation date
+   - `uptimeChecks` table: stores check results (timestamp, status, response time, isUp)
+   - Uses Drizzle ORM for type-safe database operations
 
-### 3. Monitor Durable Object (`src/monitor.ts`)
-- The `Monitor` class is a Durable Object responsible for scheduling and executing uptime checks.
-- It uses `setInterval` to perform periodic fetch requests to the target website.
-- Results are logged to the D1 database.
-- **Note:** The scheduling mechanism relies on `setInterval` within the Durable Object. While supported, consider if Cloudflare Alarms might be a more robust future improvement for long-term reliability.
+3. **Monitoring Engine** (`src/monitor.ts`)
+   - Durable Object that handles periodic health checks
+   - Uses `setInterval` for scheduling (runs every X seconds per website)
+   - Performs HTTP requests and stores results in D1 database
 
-## Getting Started
+4. **UI Components** (`src/components/WebsiteList.tsx`)
+   - Simple card-based interface showing monitored websites
+   - Displays name, URL, and check interval for each site
 
-### Prerequisites
-- Node.js installed.
-- Cloudflare account (for `wrangler` login).
+### Data Flow
+1. User adds website via API → creates database record
+2. Monitor Durable Object created → schedules periodic checks
+3. Monitor performs HTTP requests → stores results in uptimeChecks table
+4. UI/API queries database → displays current status and historical data
 
-### Setup
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
-2.  **Database Setup:**
-    Initializes the D1 database (create, generate, migrate, seed).
-    ```bash
-    npm run db:setup
-    ```
-3.  **Run Development Server:**
-    Starts the local development environment.
-    ```bash
-    npm run dev
-    ```
+## Development Commands
+- `npm run dev` - Start local development server
+- `npm run db:setup` - Initialize database (create, migrate, seed)
+- `npm run format` - Format code with Biome
+- `npm run deploy` - Deploy to Cloudflare Workers
 
-### Development Workflow
-- **Linting/Formatting:** `npm run format`
-- **Database Migrations:** `npm run db:generate` (create migration files) -> `npm run db:migrate` (apply locally).
+## Key Files to Understand
+- `src/index.tsx:62-96` - Website creation logic with Monitor initialization
+- `src/monitor.ts:90-133` - Core health check implementation
+- `src/db/schema.ts:7-24` - Database schema definition
 
-## Next Steps
-- Review `src/index.tsx` to understand the API flow.
-- Check `src/monitor.ts` to understand how the monitoring loop works.
-- Run the app locally and try adding a website to monitor.
+## When Resuming Development
+
+### Quick Start Tasks:
+1. Run `npm run dev` to start local server
+2. Visit `http://localhost:8787` to see the UI
+3. Add a website via the API: `POST /api/website` with `{url, name, checkInterval}`
+4. Check logs to verify Monitor is running checks
+
+### Common Development Tasks:
+- **Add new API endpoints**: Extend routes in `src/index.tsx`
+- **Modify database schema**: Update `src/db/schema.ts`, then run `npm run db:generate && npm run db:migrate`
+- **Improve monitoring logic**: Edit `src/monitor.ts` (check intervals, retry logic, etc.)
+- **Enhance UI**: Modify components in `src/components/`
+
+### Current Limitations to Address:
+- No error handling on some API endpoints (marked with TODO comments)
+- No authentication/authorization
+- Basic UI with no real-time updates
+- No alerting when sites go down
+- Limited to 100 most recent checks per website
+
+The codebase is well-structured and follows Cloudflare Workers patterns. Start with the API endpoints and Monitor logic when making changes.
